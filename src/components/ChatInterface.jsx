@@ -168,7 +168,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // Symptoms translation and keys
+  // Symptoms translation annd keys
   const symptomPresets = [
     {
       id: 'critical',
