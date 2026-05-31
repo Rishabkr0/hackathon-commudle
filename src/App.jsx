@@ -57,6 +57,10 @@ export default function App() {
     return localStorage.getItem('kgmu_staff_authenticated') === 'true';
   });
 
+  const [epidemicAlert, setEpidemicAlert] = useState(() => {
+    return localStorage.getItem('kgmu_epidemic_alert') === 'true';
+  });
+
   // Compute Code Red Alert count dynamically from active bypassed queue entries and criticalAlert state
   const codeRedCount = queueData.filter(p => p.severity === 5 && p.status === 'Bypassed ⚡').length + (criticalAlert ? 1 : 0);
 
@@ -158,10 +162,31 @@ export default function App() {
       if (e.key === 'kgmu_dept_settings') {
         if (e.newValue) setDeptSettings(JSON.parse(e.newValue));
       }
+      if (e.key === 'kgmu_epidemic_alert') {
+        setEpidemicAlert(e.newValue === 'true');
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  // Sync epidemicAlert to localStorage
+  useEffect(() => {
+    localStorage.setItem('kgmu_epidemic_alert', epidemicAlert.toString());
+  }, [epidemicAlert]);
+
+  // AI Daemon: Outbreak / Epidemic Detection
+  useEffect(() => {
+    // Count patients with Dengue-like symptoms in the queue
+    const dengueCount = queueData.filter(p => 
+      p.symptoms && (p.symptoms.toLowerCase().includes('joint pain') || p.symptoms.toLowerCase().includes('जोड़ों का दर्द'))
+    ).length;
+
+    if (dengueCount >= 5 && !epidemicAlert) {
+      setEpidemicAlert(true);
+      showToast('⚠️ OUTBREAK PROTOCOL INITIATED: Potential Dengue Cluster Detected!', 'danger');
+    }
+  }, [queueData, epidemicAlert]);
 
   // Live Stats interval simulator (updates stats slowly, no random patient injection)
   useEffect(() => {
@@ -257,9 +282,11 @@ export default function App() {
   const handleResetSystem = () => {
     localStorage.removeItem('kgmu_queue_data');
     localStorage.removeItem('kgmu_critical_alert');
+    localStorage.removeItem('kgmu_epidemic_alert');
     localStorage.setItem('kgmu_total_opd', '4210');
     setQueueData([]);
     setCriticalAlert(null);
+    setEpidemicAlert(false);
     setTotalOPD(4210);
     showToast('Dashboard statistics and queue records have been reset.', 'success');
   };
@@ -471,6 +498,25 @@ export default function App() {
 
             {/* Main Command Center Grid */}
             <div className="flex-1 w-full space-y-6">
+
+              {/* Epidemic Alert Banner */}
+              {epidemicAlert && (
+                <div className="w-full bg-red-600 text-white rounded-2xl p-4 flex items-center justify-between shadow-[0_0_30px_rgba(220,38,38,0.4)] animate-pulse border-2 border-red-400">
+                  <div className="flex items-center gap-3">
+                    <ShieldAlert className="w-8 h-8 text-white animate-bounce" />
+                    <div>
+                      <h2 className="text-xl font-black uppercase tracking-widest text-white drop-shadow-md">⚠️ OUTBREAK PROTOCOL INITIATED</h2>
+                      <p className="text-sm font-bold text-red-100 uppercase tracking-wider mt-0.5">Potential Dengue Cluster Detected in Queue</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setEpidemicAlert(false)}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-xs font-bold transition-colors border border-white/40 cursor-pointer"
+                  >
+                    Acknowledge Alert
+                  </button>
+                </div>
+              )}
               
               {/* Top Row: Stats Cards */}
               <StatsCards 

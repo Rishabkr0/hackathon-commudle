@@ -105,6 +105,11 @@ const getLocalizedMessageText = (type, lang, params = {}) => {
         ? 'I fell down and twisted my ankle. It is swollen and hurts to walk, but no bleeding.'
         : 'मैं गिर गया और मेरे टखने में मोच आ गई। इसमें सूजन है और चलने में दर्द हो रहा है, लेकिन खून नहीं बह रहा।';
 
+    case 'PRESET_DENGUE':
+      return lang === 'EN'
+        ? 'I have a sudden high fever, severe joint pain, and a rash. It feels like my bones are breaking.'
+        : 'मुझे अचानक तेज बुखार, गंभीर जोड़ों का दर्द और चकत्ते हो गए हैं। ऐसा लगता है जैसे मेरी हड्डियां टूट रही हैं।';
+
     case 'PRESET_DEMO_NAME':
       return lang === 'EN' ? 'Aditya Pandey' : 'आदित्य पाण्डेय';
 
@@ -187,6 +192,12 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
       label: language === 'EN' ? 'Sprained Ankle' : 'पैर में मोच',
       symptomsEn: 'I fell down and twisted my ankle. It is swollen and hurts to walk, but no bleeding.',
       symptomsHi: 'मैं गिर गया और मेरे टखने में मोच आ गई। इसमें सूजन है और चलने में दर्द हो रहा है, लेकिन खून नहीं बह रहा।'
+    },
+    {
+      id: 'dengue',
+      label: language === 'EN' ? 'High Fever & Joint Pain 🦟' : 'तेज बुखार और जोड़ों का दर्द 🦟',
+      symptomsEn: 'I have a sudden high fever, severe joint pain, and a rash. It feels like my bones are breaking.',
+      symptomsHi: 'मुझे अचानक तेज बुखार, गंभीर जोड़ों का दर्द और चकत्ते हो गए हैं। ऐसा लगता है जैसे मेरी हड्डियां टूट रही हैं।'
     }
   ];
 
@@ -202,6 +213,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         finalType = 'PRESET_FEVER';
       } else if (messageText === symptomPresets[2].symptomsEn || messageText === symptomPresets[2].symptomsHi) {
         finalType = 'PRESET_FRACTURE';
+      } else if (messageText === symptomPresets[3].symptomsEn || messageText === symptomPresets[3].symptomsHi) {
+        finalType = 'PRESET_DENGUE';
       } else if (messageText === 'Aditya Pandey' || messageText === 'आदित्य पाण्डेय') {
         finalType = 'PRESET_DEMO_NAME';
       } else if (messageText === 'Male') {
