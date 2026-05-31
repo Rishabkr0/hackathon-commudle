@@ -7,13 +7,19 @@ import {
   ArrowRightLeft,
   Building2,
   X,
-  ShieldAlert
+  ShieldAlert,
+  Database,
+  CloudLightning,
+  Settings,
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import DashboardSidebar from './components/DashboardSidebar';
 import StatsCards from './components/StatsCards';
 import QueueTable from './components/QueueTable';
 import StaffLogin from './components/StaffLogin';
+import { appwriteService } from './services/appwrite';
 
 const INITIAL_QUEUE_DATA = [];
 
@@ -60,6 +66,97 @@ export default function App() {
   const [epidemicAlert, setEpidemicAlert] = useState(() => {
     return localStorage.getItem('kgmu_epidemic_alert') === 'true';
   });
+
+  const [isAppwriteEnabled, setIsAppwriteEnabled] = useState(() => {
+    return localStorage.getItem('kgmu_appwrite_enabled') === 'true';
+  });
+
+  const [appwriteConfig, setAppwriteConfig] = useState(() => {
+    const local = localStorage.getItem('kgmu_appwrite_config');
+    return local ? JSON.parse(local) : {
+      endpoint: 'https://cloud.appwrite.io/v1',
+      projectId: '',
+      databaseId: '',
+      collectionId: ''
+    };
+  });
+
+  const [appwriteStatus, setAppwriteStatus] = useState('disconnected'); // 'disconnected' | 'connecting' | 'connected' | 'error'
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Appwrite Connection & Sync Manager
+  useEffect(() => {
+    if (!isAppwriteEnabled) {
+      setAppwriteStatus('disconnected');
+      return;
+    }
+
+    let unsubscribe = null;
+    const connectAppwrite = async () => {
+      setAppwriteStatus('connecting');
+      const isInit = appwriteService.init(appwriteConfig);
+      
+      if (!isInit) {
+        setAppwriteStatus('error');
+        return;
+      }
+
+      try {
+        const patients = await appwriteService.getPatients();
+        setQueueData(patients);
+        setAppwriteStatus('connected');
+        showToast('Connected to Appwrite Cloud Database successfully!', 'success');
+
+        unsubscribe = appwriteService.subscribe((event) => {
+          const { events, payload } = event;
+          const isDocEvent = events.some(e => e.includes('.documents.'));
+          
+          if (!isDocEvent) return;
+
+          const mappedPatient = {
+            id: payload.patientId || payload.$id,
+            name: payload.name,
+            age: payload.age,
+            gender: payload.gender,
+            mobile: payload.mobile,
+            symptoms: payload.symptoms,
+            department: payload.department,
+            severity: payload.severity,
+            waitTime: payload.waitTime,
+            status: payload.status,
+            isVoice: !!payload.isVoice,
+            $id: payload.$id
+          };
+
+          if (events.some(e => e.includes('.create'))) {
+            setQueueData(prev => {
+              if (prev.some(p => p.id === mappedPatient.id)) return prev;
+              return [mappedPatient, ...prev];
+            });
+          }
+          else if (events.some(e => e.includes('.update'))) {
+            setQueueData(prev => prev.map(p => p.$id === mappedPatient.$id ? mappedPatient : p));
+          }
+          else if (events.some(e => e.includes('.delete'))) {
+            setQueueData(prev => prev.filter(p => p.$id !== payload.$id));
+          }
+        });
+
+      } catch (err) {
+        console.error("Appwrite Sync Fail:", err);
+        setAppwriteStatus('error');
+        showToast('Appwrite Cloud Database failed to synchronize. Verify configuration and attributes.', 'danger');
+      }
+    };
+
+    connectAppwrite();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [isAppwriteEnabled, appwriteConfig]);
 
   // Compute Code Red Alert count dynamically from active bypassed queue entries and criticalAlert state
   const codeRedCount = queueData.filter(p => p.severity === 5 && p.status === 'Bypassed ⚡').length + (criticalAlert ? 1 : 0);
@@ -226,69 +323,135 @@ export default function App() {
   };
 
   // Callback when patient simulator registers normal triage
-  const handleNormalTriage = (patient) => {
-    setQueueData(prev => [patient, ...prev]);
-    showToast(`Patient ${patient.id} registered & added to live queue.`);
+  const handleNormalTriage = async (patient) => {
+    if (isAppwriteEnabled && appwriteStatus === 'connected') {
+      try {
+        const doc = await appwriteService.createPatient(patient);
+        if (doc) {
+          showToast(`Patient ${patient.id} synchronized directly to Appwrite Cloud!`, 'success');
+        }
+      } catch (err) {
+        showToast('Appwrite Cloud connection lost. Saving patient locally.', 'danger');
+        setQueueData(prev => [patient, ...prev]);
+      }
+    } else {
+      setQueueData(prev => [patient, ...prev]);
+      showToast(`Patient ${patient.id} registered & added to live queue.`);
+    }
   };
 
   // Accept and Route critical patient
-  const handleAcceptRoute = () => {
+  const handleAcceptRoute = async () => {
     if (!criticalAlert) return;
 
-    // Check if patient is already in the queue list, if not add them
-    const exists = queueData.some(p => p.id === criticalAlert.id);
-    if (!exists) {
-      setQueueData(prev => [
-        {
-          ...criticalAlert,
-          status: 'Routed to Cardiology'
-        },
-        ...prev
-      ]);
-    }
+    const routedPatient = {
+      ...criticalAlert,
+      status: 'Routed to Cardiology'
+    };
 
-    showToast(`Patient ${criticalAlert.id} successfully routed to Lari Cardiology Emergency!`, 'success');
+    if (isAppwriteEnabled && appwriteStatus === 'connected') {
+      try {
+        const doc = await appwriteService.createPatient(routedPatient);
+        if (doc) {
+          showToast(`Critical Patient ${criticalAlert.id} routed & synced to Appwrite Cloud!`, 'success');
+        }
+      } catch (err) {
+        showToast('Appwrite Cloud sync failed. Saving locally.', 'danger');
+        const exists = queueData.some(p => p.id === criticalAlert.id);
+        if (!exists) {
+          setQueueData(prev => [routedPatient, ...prev]);
+        }
+      }
+    } else {
+      const exists = queueData.some(p => p.id === criticalAlert.id);
+      if (!exists) {
+        setQueueData(prev => [routedPatient, ...prev]);
+      }
+      showToast(`Patient ${criticalAlert.id} successfully routed to Lari Cardiology Emergency!`, 'success');
+    }
     setCriticalAlert(null);
   };
 
   // Route low severity patients to Civil Hospital (Load Balance Protocol)
-  const handleRouteAllToCivil = () => {
+  const handleRouteAllToCivil = async () => {
     let count = 0;
-    setQueueData(prev => prev.map(p => {
-      if ((p.severity === 1 || p.severity === 2) && p.status !== 'Routed to Civil') {
-        count++;
-        return {
-          ...p,
-          status: 'Routed to Civil',
-          waitTime: 0
-        };
-      }
-      return p;
-    }));
+    const promises = [];
 
-    showToast(`Successfully routed ${count} non-critical patients to Civil Hospital.`, 'success');
+    if (isAppwriteEnabled && appwriteStatus === 'connected') {
+      for (const p of queueData) {
+        if ((p.severity === 1 || p.severity === 2) && p.status !== 'Routed to Civil' && p.$id) {
+          count++;
+          promises.push(appwriteService.updatePatientStatus(p.$id, 'Routed to Civil'));
+        }
+      }
+      if (promises.length > 0) {
+        try {
+          await Promise.all(promises);
+          showToast(`Successfully load-balanced ${count} patients directly to Civil in Appwrite Cloud!`, 'success');
+        } catch (err) {
+          showToast('Appwrite bulk redirect sync error.', 'danger');
+        }
+      }
+    } else {
+      setQueueData(prev => prev.map(p => {
+        if ((p.severity === 1 || p.severity === 2) && p.status !== 'Routed to Civil') {
+          count++;
+          return {
+            ...p,
+            status: 'Routed to Civil',
+            waitTime: 0
+          };
+        }
+        return p;
+      }));
+      showToast(`Successfully routed ${count} non-critical patients to Civil Hospital.`, 'success');
+    }
   };
 
-  const handleUpdatePatientStatus = (patientId, newStatus) => {
-    setQueueData(prev => prev.map(p => {
-      if (p.id === patientId) {
-        return { ...p, status: newStatus };
+  const handleUpdatePatientStatus = async (patientId, newStatus) => {
+    const patient = queueData.find(p => p.id === patientId);
+    
+    if (isAppwriteEnabled && appwriteStatus === 'connected' && patient && patient.$id) {
+      try {
+        await appwriteService.updatePatientStatus(patient.$id, newStatus);
+        showToast(`Patient ${patientId} status updated in Appwrite Cloud to ${newStatus}.`, 'success');
+      } catch (err) {
+        showToast('Appwrite Cloud update failed.', 'danger');
       }
-      return p;
-    }));
-    showToast(`Patient ${patientId} status updated to ${newStatus}.`, 'success');
+    } else {
+      setQueueData(prev => prev.map(p => {
+        if (p.id === patientId) {
+          return { ...p, status: newStatus };
+        }
+        return p;
+      }));
+      showToast(`Patient ${patientId} status updated to ${newStatus}.`, 'success');
+    }
   };
 
-  const handleResetSystem = () => {
+  const handleResetSystem = async () => {
     localStorage.removeItem('kgmu_queue_data');
     localStorage.removeItem('kgmu_critical_alert');
     localStorage.removeItem('kgmu_epidemic_alert');
     localStorage.setItem('kgmu_total_opd', '4210');
+    
+    if (isAppwriteEnabled && appwriteStatus === 'connected') {
+      try {
+        const patients = await appwriteService.getPatients();
+        const deletePromises = patients.map(p => appwriteService.deletePatient(p.$id));
+        await Promise.all(deletePromises);
+        showToast('Appwrite Cloud Database and queue records successfully reset!', 'success');
+      } catch (err) {
+        showToast('Local queue reset, but failed to wipe some Appwrite entries.', 'danger');
+      }
+    } else {
+      showToast('Dashboard statistics and queue records have been reset.', 'success');
+    }
+    
     setQueueData([]);
     setCriticalAlert(null);
     setEpidemicAlert(false);
     setTotalOPD(4210);
-    showToast('Dashboard statistics and queue records have been reset.', 'success');
   };
 
   const handleLoginSuccess = () => {
@@ -360,6 +523,23 @@ export default function App() {
               className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-full text-xs font-bold text-slate-500 hover:text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 hover:shadow-xs select-none"
             >
               Reset Queue
+            </button>
+
+            {/* Appwrite Cloud Sync Button */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className={`px-3.5 py-1.5 border rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:-translate-y-0.5 hover:shadow-xs select-none ${
+                isAppwriteEnabled && appwriteStatus === 'connected'
+                  ? 'bg-emerald-50 border-emerald-250 text-emerald-700 hover:bg-emerald-100 font-extrabold'
+                  : isAppwriteEnabled && appwriteStatus === 'connecting'
+                  ? 'bg-yellow-50 border-yellow-250 text-yellow-750 animate-pulse font-extrabold'
+                  : isAppwriteEnabled && appwriteStatus === 'error'
+                  ? 'bg-red-50 border-red-250 text-red-750 hover:bg-red-100 font-extrabold'
+                  : 'bg-white hover:bg-slate-100 border-slate-250 text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              {isAppwriteEnabled && appwriteStatus === 'connected' ? 'Cloud Synced' : 'Cloud Setup'}
             </button>
 
             {/* View Switcher (Pill-shaped toggle button) */}
@@ -774,6 +954,192 @@ export default function App() {
                   Accept & Route Patient
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appwrite Cloud Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white border border-slate-350 max-w-xl w-full rounded-3xl p-6 relative shadow-2xl overflow-y-auto max-h-[90vh]">
+            <button 
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute top-4 right-4 p-1.5 bg-slate-100 hover:bg-slate-205 border border-slate-200 rounded-full text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            
+            <h3 className="text-xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+              <Database className="w-5 h-5 text-cyan-605 animate-pulse" />
+              Appwrite Cloud Sync Settings
+            </h3>
+            <p className="text-xs text-slate-500 mb-6 font-semibold">Integrate live out-patient queues dynamically with Appwrite Cloud Backend</p>
+
+            <div className="space-y-5">
+              {/* Cloud Sync Toggle */}
+              <div className="flex items-center justify-between p-4 bg-cyan-50/50 border border-cyan-200/65 rounded-2xl">
+                <div>
+                  <span className="text-sm font-bold text-cyan-900 block">Enable Appwrite Cloud Sync</span>
+                  <span className="text-[11px] text-slate-500 font-medium">Bypass local database in favor of real-time cloud data.</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={isAppwriteEnabled}
+                    onChange={(e) => {
+                      setIsAppwriteEnabled(e.target.checked);
+                      localStorage.setItem('kgmu_appwrite_enabled', e.target.checked.toString());
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600 peer-checked:after:bg-white peer-checked:after:border-transparent transition-all border border-slate-300/40" />
+                </label>
+              </div>
+
+              {/* Status Banner */}
+              <div className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
+                appwriteStatus === 'connected' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
+                appwriteStatus === 'connecting' ? 'bg-yellow-50 border-yellow-250 text-yellow-800' :
+                appwriteStatus === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+                'bg-slate-50 border-slate-200 text-slate-600'
+              }`}>
+                <span className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${
+                    appwriteStatus === 'connected' ? 'bg-emerald-500 animate-ping' :
+                    appwriteStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                    appwriteStatus === 'error' ? 'bg-red-500 shadow-[0_0_4px_red]' :
+                    'bg-slate-450'
+                  }`} />
+                  Connection Status: <strong className="uppercase">{appwriteStatus}</strong>
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">APPWRITE WEB SDK</span>
+              </div>
+
+              {/* Inputs */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">Appwrite Endpoint</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://cloud.appwrite.io/v1"
+                    value={appwriteConfig.endpoint}
+                    onChange={(e) => {
+                      const updated = { ...appwriteConfig, endpoint: e.target.value };
+                      setAppwriteConfig(updated);
+                      localStorage.setItem('kgmu_appwrite_config', JSON.stringify(updated));
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-500/50 font-medium transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="col-span-1">
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Project ID</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 660ea1..."
+                      value={appwriteConfig.projectId}
+                      onChange={(e) => {
+                        const updated = { ...appwriteConfig, projectId: e.target.value };
+                        setAppwriteConfig(updated);
+                        localStorage.setItem('kgmu_appwrite_config', JSON.stringify(updated));
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-500/50 font-medium transition-all"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Database ID</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. queue_db"
+                      value={appwriteConfig.databaseId}
+                      onChange={(e) => {
+                        const updated = { ...appwriteConfig, databaseId: e.target.value };
+                        setAppwriteConfig(updated);
+                        localStorage.setItem('kgmu_appwrite_config', JSON.stringify(updated));
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-500/50 font-medium transition-all"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="text-xs font-bold text-slate-500 block mb-1">Collection ID</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. patients"
+                      value={appwriteConfig.collectionId}
+                      onChange={(e) => {
+                        const updated = { ...appwriteConfig, collectionId: e.target.value };
+                        setAppwriteConfig(updated);
+                        localStorage.setItem('kgmu_appwrite_config', JSON.stringify(updated));
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-500/50 font-medium transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Guide Accordion */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Info className="w-4 h-4 text-cyan-600" />
+                  Appwrite Collection Schema Guide:
+                </h4>
+                <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+                  In order for Cloud Sync to function flawlessly, create a Collection with the following attributes in your Appwrite console:
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto pr-1">
+                  {[
+                    { name: 'patientId', type: 'String (Size: 255)' },
+                    { name: 'name', type: 'String (Size: 255)' },
+                    { name: 'age', type: 'Integer' },
+                    { name: 'gender', type: 'String (Size: 255)' },
+                    { name: 'mobile', type: 'String (Size: 255)' },
+                    { name: 'symptoms', type: 'String (Size: 4000)' },
+                    { name: 'department', type: 'String (Size: 255)' },
+                    { name: 'severity', type: 'Integer' },
+                    { name: 'waitTime', type: 'Integer' },
+                    { name: 'status', type: 'String (Size: 255)' },
+                    { name: 'isVoice', type: 'Boolean' },
+                  ].map((attr) => (
+                    <div key={attr.name} className="flex justify-between items-center text-[10px] bg-white border border-slate-150 px-2.5 py-1.5 rounded-lg">
+                      <code className="text-cyan-700 font-extrabold font-mono">{attr.name}</code>
+                      <span className="text-slate-400 font-semibold">{attr.type}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2.5 text-[10px] text-slate-400 font-bold leading-normal">
+                  ⚠️ Note: Disable Appwrite Document Security rules (allow read/write for guest role or configure appropriate API permissions) to test out the integration smoothly!
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsSettingsOpen(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-650 hover:text-slate-850 transition-all cursor-pointer shadow-3xs"
+              >
+                Close Settings
+              </button>
+              <button 
+                onClick={() => {
+                  setIsAppwriteEnabled(false);
+                  setTimeout(() => {
+                    setIsAppwriteEnabled(true);
+                    localStorage.setItem('kgmu_appwrite_enabled', 'true');
+                  }, 100);
+                  showToast('Re-initializing cloud sync connection...', 'info');
+                }}
+                disabled={!isAppwriteEnabled}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 select-none ${
+                  isAppwriteEnabled
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-550 hover:to-blue-550 text-white shadow-cyan-500/10 cursor-pointer'
+                    : 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Connect & Sync Database
+              </button>
             </div>
           </div>
         </div>
