@@ -23,6 +23,15 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
   const [currentState, setCurrentState] = useState(CHAT_STATE.AWAITING_SYMPTOMS);
   const [registeredPatientId, setRegisteredPatientId] = useState(null);
   const [isVoice, setIsVoice] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
   
   // Patient details state accumulator
   const [tempPatientData, setTempPatientData] = useState({
@@ -391,22 +400,28 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
     }, 1200);
   };
 
+  const cancelRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+    }
+    setIsRecording(false);
+  };
+
   const handleVoiceRecord = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     if (isRecording) {
-      setIsRecording(false);
-      setIsVoice(true);
-      if (currentState === CHAT_STATE.AWAITING_SYMPTOMS) {
-        const voiceText = language === 'EN' 
-          ? symptomPresets[0].symptomsEn 
-          : symptomPresets[0].symptomsHi;
-        handleSend(voiceText);
-      }
-    } else {
+      cancelRecording();
+      return;
+    }
+
+    if (!SpeechRecognition) {
+      // Fallback: Use simulator presets if browser does not support Web Speech API
       setIsRecording(true);
+      setIsVoice(true);
       setTimeout(() => {
         setIsRecording(recording => {
           if (recording) {
-            setIsVoice(true);
             if (currentState === CHAT_STATE.AWAITING_SYMPTOMS) {
               const voiceText = language === 'EN' 
                 ? symptomPresets[0].symptomsEn 
@@ -425,6 +440,62 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           }
           return false;
         });
+      }, 2500);
+      return;
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.lang = language === 'EN' ? 'en-US' : 'hi-IN';
+
+      rec.onstart = () => {
+        setIsRecording(true);
+        setInput('');
+      };
+
+      rec.onresult = (event) => {
+        const currentTranscript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+        
+        setInput(currentTranscript);
+      };
+
+      rec.onerror = (event) => {
+        console.error("Speech recognition error", event.error);
+        cancelRecording();
+      };
+
+      rec.onend = () => {
+        setIsRecording(false);
+        setIsVoice(true);
+        // Automatically send the accumulated input when they stop speaking if there is any input
+        setTimeout(() => {
+          setInput(current => {
+            if (current.trim()) {
+              handleSend(current);
+            }
+            return '';
+          });
+        }, 600);
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (e) {
+      console.error(e);
+      // Fallback
+      setIsRecording(true);
+      setIsVoice(true);
+      setTimeout(() => {
+        setIsRecording(false);
+        if (currentState === CHAT_STATE.AWAITING_SYMPTOMS) {
+          const voiceText = language === 'EN' ? symptomPresets[0].symptomsEn : symptomPresets[0].symptomsHi;
+          handleSend(voiceText);
+        }
       }, 2500);
     }
   };
@@ -793,12 +864,16 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
                     <Mic className="w-8 h-8 animate-pulse" />
                   </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-slate-800">Recording Patient Audio...</p>
-                  <p className="text-[10px] text-slate-550 mt-1 font-semibold">Simulating details transcript transcription</p>
+                <div className="text-center px-4 max-w-full">
+                  <p className="text-sm font-bold text-slate-800">
+                    {language === 'EN' ? 'Listening to Patient...' : 'मरीज की आवाज सुन रहे हैं...'}
+                  </p>
+                  <p className="text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-650 mt-2 font-mono font-medium min-h-[50px] flex items-center justify-center break-words max-w-[280px]">
+                    {input.trim() ? input : (language === 'EN' ? "Speak now..." : "कृपया बोलना शुरू करें...")}
+                  </p>
                 </div>
                 <button 
-                  onClick={() => setIsRecording(false)}
+                  onClick={cancelRecording}
                   className="mt-4 px-4 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-red-700 text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                 >
                   Cancel Recording
