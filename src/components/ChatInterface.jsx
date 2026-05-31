@@ -162,7 +162,6 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const chatEndRef = useRef(null);
-  const messageIdRef = useRef(100);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -216,7 +215,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
 
     // Add user message to UI
     const userMsg = {
-      id: messageIdRef.current++,
+      id: messages.length + 1,
       sender: 'user',
       type: finalType,
       text: messageText,
@@ -252,45 +251,51 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         setIsTyping(true);
 
         setTimeout(() => {
-          const log1 = {
-            id: messageIdRef.current++,
-            sender: 'bot',
-            type: 'ANALYZING_SYMPTOMS',
-            text: language === 'EN' 
-              ? "🔍 *AI Agent:* Parsing symptoms for clinical indicators..."
-              : "🔍 *AI Agent:* नैदानिक लक्षणों के लिए जांच की जा रही है...",
-            timestamp: timeStr
-          };
-          setMessages(prev => [...prev, log1]);
-          
-          setTimeout(() => {
-            const log2 = {
-              id: messageIdRef.current++,
+          setMessages(prev => {
+            const log1 = {
+              id: prev.length + 1,
               sender: 'bot',
-              type: 'ACUITY_DETECTION',
-              params: { isCritical },
-              text: isCritical 
-                ? (language === 'EN' 
-                    ? "🚨 *AI Agent:* Severe cardiovascular indicators detected. Triage severity level 5."
-                    : "🚨 *AI Agent:* गंभीर हृदय रोग लक्षण मिले हैं। ट्राइएज स्तर 5 (अति गंभीर)।")
-                : (language === 'EN'
-                    ? "🟢 *AI Agent:* General outpatient symptoms detected. Triage severity level 2-3."
-                    : "🟢 *AI Agent:* सामान्य ओपीडी रोग लक्षण मिले हैं। ट्राइएज स्तर 2-3 (सामान्य)।"),
+              type: 'ANALYZING_SYMPTOMS',
+              text: language === 'EN' 
+                ? "🔍 *AI Agent:* Parsing symptoms for clinical indicators..."
+                : "🔍 *AI Agent:* नैदानिक लक्षणों के लिए जांच की जा रही है...",
               timestamp: timeStr
             };
-            setMessages(prev => [...prev, log2]);
-            
-            setTimeout(() => {
-              const log3 = {
-                id: messageIdRef.current++,
+            return [...prev, log1];
+          });
+          
+          setTimeout(() => {
+            setMessages(prev => {
+              const log2 = {
+                id: prev.length + 1,
                 sender: 'bot',
-                type: 'ASK_NAME',
-                text: language === 'EN'
-                  ? "To create your triage record and book your appointment, please enter your **Full Name**:"
-                  : "ट्राइएज रिकॉर्ड और पंजीकरण बनाने के लिए, कृपया अपना **पूरा नाम** दर्ज करें:",
+                type: 'ACUITY_DETECTION',
+                params: { isCritical },
+                text: isCritical 
+                  ? (language === 'EN' 
+                      ? "🚨 *AI Agent:* Severe cardiovascular indicators detected. Triage severity level 5."
+                      : "🚨 *AI Agent:* गंभीर हृदय रोग लक्षण मिले हैं। ट्राइएज स्तर 5 (अति गंभीर)।")
+                  : (language === 'EN'
+                      ? "🟢 *AI Agent:* General outpatient symptoms detected. Triage severity level 2-3."
+                      : "🟢 *AI Agent:* सामान्य ओपीडी रोग लक्षण मिले हैं। ट्राइएज स्तर 2-3 (सामान्य)।"),
                 timestamp: timeStr
               };
-              setMessages(prev => [...prev, log3]);
+              return [...prev, log2];
+            });
+            
+            setTimeout(() => {
+              setMessages(prev => {
+                const log3 = {
+                  id: prev.length + 1,
+                  sender: 'bot',
+                  type: 'ASK_NAME',
+                  text: language === 'EN'
+                    ? "To create your triage record and book your appointment, please enter your **Full Name**:"
+                    : "ट्राइएज रिकॉर्ड और पंजीकरण बनाने के लिए, कृपया अपना **पूरा नाम** दर्ज करें:",
+                  timestamp: timeStr
+                };
+                return [...prev, log3];
+              });
               setIsTyping(false);
               setCurrentState(CHAT_STATE.AWAITING_NAME);
             }, 850);
@@ -304,17 +309,19 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           name: messageText
         }));
 
-        const botReply = {
-          id: messageIdRef.current++,
-          sender: 'bot',
-          type: 'ASK_AGE',
-          params: { name: messageText },
-          text: language === 'EN'
-            ? `Thank you, ${messageText}. What is your **Age** (in years)?`
-            : `धन्यवाद, ${messageText}। आपकी **उम्र** क्या है (वर्षों में)?`,
-          timestamp: timeStr
-        };
-        setMessages(prev => [...prev, botReply]);
+        setMessages(prev => {
+          const botReply = {
+            id: prev.length + 1,
+            sender: 'bot',
+            type: 'ASK_AGE',
+            params: { name: messageText },
+            text: language === 'EN'
+              ? `Thank you, ${messageText}. What is your **Age** (in years)?`
+              : `धन्यवाद, ${messageText}। आपकी **उम्र** क्या है (वर्षों में)?`,
+            timestamp: timeStr
+          };
+          return [...prev, botReply];
+        });
         setCurrentState(CHAT_STATE.AWAITING_AGE);
 
       } else if (currentState === CHAT_STATE.AWAITING_AGE) {
@@ -324,16 +331,18 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           age: messageText
         }));
 
-        const botReply = {
-          id: messageIdRef.current++,
-          sender: 'bot',
-          type: 'ASK_GENDER',
-          text: language === 'EN'
-            ? "What is your **Gender**? (Male / Female / Other)"
-            : "आपका **लिंग** क्या है? (पुरुष / महिला / अन्य)",
-          timestamp: timeStr
-        };
-        setMessages(prev => [...prev, botReply]);
+        setMessages(prev => {
+          const botReply = {
+            id: prev.length + 1,
+            sender: 'bot',
+            type: 'ASK_GENDER',
+            text: language === 'EN'
+              ? "What is your **Gender**? (Male / Female / Other)"
+              : "आपका **लिंग** क्या है? (पुरुष / महिला / अन्य)",
+            timestamp: timeStr
+          };
+          return [...prev, botReply];
+        });
         setCurrentState(CHAT_STATE.AWAITING_GENDER);
 
       } else if (currentState === CHAT_STATE.AWAITING_GENDER) {
@@ -343,16 +352,18 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           gender: messageText
         }));
 
-        const botReply = {
-          id: messageIdRef.current++,
-          sender: 'bot',
-          type: 'ASK_MOBILE',
-          text: language === 'EN'
-            ? "Please enter your **10-digit Mobile Number** for appointment verification and SMS updates:"
-            : "सत्यापन और SMS अपडेट के लिए कृपया अपना **10-अंकीय मोबाइल नंबर** दर्ज करें:",
-          timestamp: timeStr
-        };
-        setMessages(prev => [...prev, botReply]);
+        setMessages(prev => {
+          const botReply = {
+            id: prev.length + 1,
+            sender: 'bot',
+            type: 'ASK_MOBILE',
+            text: language === 'EN'
+              ? "Please enter your **10-digit Mobile Number** for appointment verification and SMS updates:"
+              : "सत्यापन और SMS अपडेट के लिए कृपया अपना **10-अंकीय मोबाइल नंबर** दर्ज करें:",
+            timestamp: timeStr
+          };
+          return [...prev, botReply];
+        });
         setCurrentState(CHAT_STATE.AWAITING_MOBILE);
 
       } else if (currentState === CHAT_STATE.AWAITING_MOBILE) {
@@ -381,30 +392,31 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             isVoice: isVoice
           };
 
-          const botReply = {
-            id: messageIdRef.current++,
-            sender: 'bot',
-            type: 'CRITICAL_CONFIRM',
-            params: { name: finalData.name, patientId },
-            text: language === 'EN'
-              ? `Processing emergency registration... Account generated for ${finalData.name}.\n\nPatient ID: ${patientId}\nRecommended: Lari Cardiology Emergency`
-              : `आपातकालीन पंजीकरण किया जा रहा है... ${finalData.name} के लिए खाता तैयार।\n\nरोगी आईडी: ${patientId}\nसुझाव: लारी कार्डियोलॉजी इमरजेंसी`,
-            timestamp: timeStr
-          };
+          setMessages(prev => {
+            const botReply = {
+              id: prev.length + 1,
+              sender: 'bot',
+              type: 'CRITICAL_CONFIRM',
+              params: { name: finalData.name, patientId },
+              text: language === 'EN'
+                ? `Processing emergency registration... Account generated for ${finalData.name}.\n\nPatient ID: ${patientId}\nRecommended: Lari Cardiology Emergency`
+                : `आपातकालीन पंजीकरण किया जा रहा है... ${finalData.name} के लिए खाता तैयार।\n\nरोगी आईडी: ${patientId}\nसुझाव: लारी कार्डियोलॉजी इमरजेंसी`,
+              timestamp: timeStr
+            };
 
-          const bypassCard = {
-            id: messageIdRef.current++,
-            sender: 'bot',
-            isBypassCard: true,
-            type: 'CRITICAL_BYPASS',
-            text: language === 'EN'
-              ? `🚨 CRITICAL CARDIOVASCULAR EMERGENCY. Proceed immediately to Lari Cardiology Emergency. Your queue number has been bypassed. Show this screen at the gate.`
-              : `🚨 गंभीर हृदय आपातकाल। तुरंत लारी कार्डियोलॉजी इमरजेंसी (Lari Cardiology Emergency) में जाएं। आपका नंबर बाईपास कर दिया गया है। गेट पर यह स्क्रीन दिखाएं।`,
-            patientId: patientId,
-            timestamp: timeStr
-          };
-
-          setMessages(prev => [...prev, botReply, bypassCard]);
+            const bypassCard = {
+              id: prev.length + 2,
+              sender: 'bot',
+              isBypassCard: true,
+              type: 'CRITICAL_BYPASS',
+              text: language === 'EN'
+                ? `🚨 CRITICAL CARDIOVASCULAR EMERGENCY. Proceed immediately to Lari Cardiology Emergency. Your queue number has been bypassed. Show this screen at the gate.`
+                : `🚨 गंभीर हृदय आपातकाल। तुरंत लारी कार्डियोलॉजी इमरजेंसी (Lari Cardiology Emergency) में जाएं। आपका नंबर बाईपास कर दिया गया है। गेट पर यह स्क्रीन दिखाएं।`,
+              patientId: patientId,
+              timestamp: timeStr
+            };
+            return [...prev, botReply, bypassCard];
+          });
           onCriticalTriage(criticalPatient);
           setRegisteredPatientId(patientId);
           setCurrentState(CHAT_STATE.COMPLETED);
@@ -425,15 +437,17 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
               ? `⚠️ *KGMU AI:* KGMU ${dept} is experiencing high congestion. Estimated wait time is **${wait} minutes**.\n\nLucknow Civil Hospital is operating at low load with a wait time of only **15 minutes**.\n\nWould you like me to redirect and register your slot at **Lucknow Civil Hospital** instead for faster treatment?`
               : `⚠️ *KGMU AI:* KGMU ${dept} में अत्यधिक भीड़ है। अनुमानित प्रतीक्षा समय **${wait} मिनट** है।\n\nलखनऊ सिविल अस्पताल में वर्तमान में प्रतीक्षा समय केवल **15 मिनट** है।\n\nक्या आप अपना ओपीडी स्लॉट **लखनऊ सिविल अस्पताल** में पुनर्निर्देशित और पंजीकृत करना चाहेंगे?`;
             
-            const botReply = {
-              id: messageIdRef.current++,
-              sender: 'bot',
-              type: 'CONGESTION_PROMPT',
-              params: { dept, wait },
-              text: congestionText,
-              timestamp: timeStr
-            };
-            setMessages(prev => [...prev, botReply]);
+            setMessages(prev => {
+              const botReply = {
+                id: prev.length + 1,
+                sender: 'bot',
+                type: 'CONGESTION_PROMPT',
+                params: { dept, wait },
+                text: congestionText,
+                timestamp: timeStr
+              };
+              return [...prev, botReply];
+            });
             setCurrentState(CHAT_STATE.AWAITING_CONGESTION_DECISION);
           } else {
             const normalPatient = {
@@ -450,18 +464,19 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
               isVoice: isVoice
             };
 
-            const botReply = {
-              id: messageIdRef.current++,
-              sender: 'bot',
-              type: 'NORMAL_CONFIRM',
-              params: { name: finalData.name, patientId, dept, severity, wait, mobile: finalData.mobile },
-              text: language === 'EN'
-                ? `Appointment registered successfully for ${finalData.name}.\n\nPatient ID: ${patientId}\nRecommended Department: ${dept} OPD\nTriage Level: ${severity}\nEstimated wait: ${wait} mins.\n\nVerification SMS ticket sent to ${finalData.mobile}.`
-                : `पंजीकरण पूरा हुआ, ${finalData.name}।\n\nरोगी आईडी: ${patientId}\nअनुशंसित विभाग: KGMU ${dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nआपातकालीन स्तर: ${severity}\nअनुमानित प्रतीक्षा: ${wait} मिनट।\n\nSMS टिकट ${finalData.mobile} पर भेज दिया गया है।`,
-              timestamp: timeStr
-            };
-
-            setMessages(prev => [...prev, botReply]);
+            setMessages(prev => {
+              const botReply = {
+                id: prev.length + 1,
+                sender: 'bot',
+                type: 'NORMAL_CONFIRM',
+                params: { name: finalData.name, patientId, dept, severity, wait, mobile: finalData.mobile },
+                text: language === 'EN'
+                  ? `Appointment registered successfully for ${finalData.name}.\n\nPatient ID: ${patientId}\nRecommended Department: ${dept} OPD\nTriage Level: ${severity}\nEstimated wait: ${wait} mins.\n\nVerification SMS ticket sent to ${finalData.mobile}.`
+                  : `पंजीकरण पूरा हुआ, ${finalData.name}।\n\nरोगी आईडी: ${patientId}\nअनुशंसित विभाग: KGMU ${dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nआपातकालीन स्तर: ${severity}\nअनुमानित प्रतीक्षा: ${wait} मिनट।\n\nSMS टिकट ${finalData.mobile} पर भेज दिया गया है।`,
+                timestamp: timeStr
+              };
+              return [...prev, botReply];
+            });
             onNormalTriage(normalPatient);
             setRegisteredPatientId(patientId);
             setCurrentState(CHAT_STATE.COMPLETED);
@@ -493,18 +508,19 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             isVoice: isVoice
           };
 
-          const botReply = {
-            id: messageIdRef.current++,
-            sender: 'bot',
-            type: 'CIVIL_CONFIRM',
-            params: { patientId },
-            text: language === 'EN'
-              ? `Slot registered successfully at Lucknow Civil Hospital General OPD.\n\nPatient ID: ${patientId}\nEstimated wait: 15 mins.\n\nAmbulance/transit load-balanced telemetry logged.`
-              : `लखनऊ सिविल अस्पताल जनरल ओपीडी में स्लॉट सफलतापूर्वक पंजीकृत।\n\nरोगी आईडी: ${patientId}\nअनुमानित प्रतीक्षा: 15 मिनट।`,
-            timestamp: timeStr
-          };
-
-          setMessages(prev => [...prev, botReply]);
+          setMessages(prev => {
+            const botReply = {
+              id: prev.length + 1,
+              sender: 'bot',
+              type: 'CIVIL_CONFIRM',
+              params: { patientId },
+              text: language === 'EN'
+                ? `Slot registered successfully at Lucknow Civil Hospital General OPD.\n\nPatient ID: ${patientId}\nEstimated wait: 15 mins.\n\nAmbulance/transit load-balanced telemetry logged.`
+                : `लखनऊ सिविल अस्पताल जनरल ओपीडी में स्लॉट सफलतापूर्वक पंजीकृत।\n\nरोगी आईडी: ${patientId}\nअनुमानित प्रतीक्षा: 15 मिनट।`,
+              timestamp: timeStr
+            };
+            return [...prev, botReply];
+          });
           onNormalTriage(routedPatient);
           setRegisteredPatientId(patientId);
           setCurrentState(CHAT_STATE.COMPLETED);
@@ -525,18 +541,19 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             isVoice: isVoice
           };
 
-          const botReply = {
-            id: messageIdRef.current++,
-            sender: 'bot',
-            type: 'KGMU_CONFIRM',
-            params: { patientId, dept, severity, wait },
-            text: language === 'EN'
-              ? `Registered at KGMU.\n\nPatient ID: ${patientId}\nRecommended Department: ${dept} OPD\nTriage Level: ${severity}\nEstimated wait: ${wait} mins.`
-              : `KGMU में पंजीकृत किया गया।\n\nरोगी आईडी: ${patientId}\nअनुशंसित विभाग: KGMU ${dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nअनुमानित प्रतीक्षा: ${wait} मिनट।`,
-            timestamp: timeStr
-          };
-
-          setMessages(prev => [...prev, botReply]);
+          setMessages(prev => {
+            const botReply = {
+              id: prev.length + 1,
+              sender: 'bot',
+              type: 'KGMU_CONFIRM',
+              params: { patientId, dept, severity, wait },
+              text: language === 'EN'
+                ? `Registered at KGMU.\n\nPatient ID: ${patientId}\nRecommended Department: ${dept} OPD\nTriage Level: ${severity}\nEstimated wait: ${wait} mins.`
+                : `KGMU में पंजीकृत किया गया।\n\nरोगी आईडी: ${patientId}\nअनुशंसित विभाग: KGMU ${dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nअनुमानित प्रतीक्षा: ${wait} मिनट।`,
+              timestamp: timeStr
+            };
+            return [...prev, botReply];
+          });
           onNormalTriage(normalPatient);
           setRegisteredPatientId(patientId);
           setCurrentState(CHAT_STATE.COMPLETED);
