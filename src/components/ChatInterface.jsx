@@ -19,6 +19,109 @@ const CHAT_STATE = {
   COMPLETED: 'COMPLETED'
 };
 
+const getLocalizedMessageText = (type, lang, params = {}) => {
+  switch (type) {
+    case 'WELCOME':
+      return lang === 'EN' 
+        ? "Welcome to KGMU AI Triage. 🏥\n\nI am the KGMU Emergency Assistant. Please describe your symptoms in detail so I can determine your triage level.\n\nYou can type your symptoms, use the quick buttons below, or hold the mic 🎙️ to send a voice note."
+        : "KGMU AI ट्राइएज में आपका स्वागत है। 🏥\n\nमैं KGMU आपातकालीन सहायक हूँ। कृपया अपने लक्षणों का विस्तार से वर्णन करें ताकि मैं आपकी आपातकालीन गंभीरता (Triage Level) निर्धारित कर सकूं।\n\nआप नीचे दिए गए बटनों का उपयोग कर सकते हैं, टाइप कर सकते हैं, या वॉयस नोट भेजने के लिए माइक 🎙️ बटन दबा सकते हैं।";
+        
+    case 'ANALYZING_SYMPTOMS':
+      return lang === 'EN'
+        ? "🔍 *AI Agent:* Parsing symptoms for clinical indicators..."
+        : "🔍 *AI Agent:* नैदानिक लक्षणों के लिए जांच की जा रही है...";
+        
+    case 'ACUITY_DETECTION':
+      return params.isCritical
+        ? (lang === 'EN'
+            ? "🚨 *AI Agent:* Severe cardiovascular indicators detected. Triage severity level 5."
+            : "🚨 *AI Agent:* गंभीर हृदय रोग लक्षण मिले हैं। ट्राइएज स्तर 5 (अति गंभीर)।")
+        : (lang === 'EN'
+            ? "🟢 *AI Agent:* General outpatient symptoms detected. Triage severity level 2-3."
+            : "🟢 *AI Agent:* सामान्य ओपीडी रोग लक्षण मिले हैं। ट्राइएज स्तर 2-3 (सामान्य)।");
+            
+    case 'ASK_NAME':
+      return lang === 'EN'
+        ? "To create your triage record and book your appointment, please enter your **Full Name**:"
+        : "ट्राइएज रिकॉर्ड और पंजीकरण बनाने के लिए, कृपया अपना **पूरा नाम** दर्ज करें:";
+        
+    case 'ASK_AGE':
+      return lang === 'EN'
+        ? `Thank you, ${params.name}. What is your **Age** (in years)?`
+        : `धन्यवाद, ${params.name}। आपकी **उम्र** क्या है (वर्षों में)?`;
+        
+    case 'ASK_GENDER':
+      return lang === 'EN'
+        ? "What is your **Gender**? (Male / Female / Other)"
+        : "आपका **लिंग** क्या है? (पुरुष / महिला / अन्य)";
+        
+    case 'ASK_MOBILE':
+      return lang === 'EN'
+        ? "Please enter your **10-digit Mobile Number** for appointment verification and SMS updates:"
+        : "सत्यापन और SMS अपडेट के लिए कृपया अपना **10-अंकीय मोबाइल नंबर** दर्ज करें:";
+        
+    case 'CRITICAL_CONFIRM':
+      return lang === 'EN'
+        ? `Processing emergency registration... Account generated for ${params.name}.\n\nPatient ID: ${params.patientId}\nRecommended: Lari Cardiology Emergency`
+        : `आपातकालीन पंजीकरण किया जा रहा है... ${params.name} के लिए खाता तैयार।\n\nरोगी आईडी: ${params.patientId}\nसुझाव: लारी कार्डियोलॉजी इमरजेंसी`;
+        
+    case 'CRITICAL_BYPASS':
+      return lang === 'EN'
+        ? `🚨 CRITICAL CARDIOVASCULAR EMERGENCY. Proceed immediately to Lari Cardiology Emergency. Your queue number has been bypassed. Show this screen at the gate.`
+        : `🚨 गंभीर हृदय आपातकाल। तुरंत लारी कार्डियोलॉजी इमरजेंसी (Lari Cardiology Emergency) में जाएं। आपका नंबर बाईपास कर दिया गया है। गेट पर यह स्क्रीन दिखाएं।`;
+        
+    case 'CONGESTION_PROMPT':
+      return lang === 'EN'
+        ? `⚠️ *KGMU AI:* KGMU ${params.dept} is experiencing high congestion. Estimated wait time is **${params.wait} minutes**.\n\nLucknow Civil Hospital is operating at low load with a wait time of only **15 minutes**.\n\nWould you like me to redirect and register your slot at **Lucknow Civil Hospital** instead for faster treatment?`
+        : `⚠️ *KGMU AI:* KGMU ${params.dept} में अत्यधिक भीड़ है। अनुमानित प्रतीक्षा समय **${params.wait} मिनट** है।\n\nलखनऊ सिविल अस्पताल में वर्तमान में प्रतीक्षा समय केवल **15 मिनट** है।\n\nक्या आप अपना ओपीडी स्लॉट **लखनऊ सिविल अस्पताल** में पुनर्निर्देशित और पंजीकृत करना चाहेंगे?`;
+        
+    case 'NORMAL_CONFIRM':
+      return lang === 'EN'
+        ? `Appointment registered successfully for ${params.name}.\n\nPatient ID: ${params.patientId}\nRecommended Department: ${params.dept} OPD\nTriage Level: ${params.severity}\nEstimated wait: ${params.wait} mins.\n\nVerification SMS ticket sent to ${params.mobile}.`
+        : `पंजीकरण पूरा हुआ, ${params.name}।\n\nरोगी आईडी: ${params.patientId}\nअनुशंसित विभाग: KGMU ${params.dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nआपातकालीन स्तर: ${params.severity}\nअनुमानित प्रतीक्षा: ${params.wait} मिनट।\n\nSMS टिकट ${params.mobile} पर भेज दिया गया है।`;
+        
+    case 'CIVIL_CONFIRM':
+      return lang === 'EN'
+        ? `Slot registered successfully at Lucknow Civil Hospital General OPD.\n\nPatient ID: ${params.patientId}\nEstimated wait: 15 mins.\n\nAmbulance/transit load-balanced telemetry logged.`
+        : `लखनऊ सिविल अस्पताल जनरल ओपीडी में स्लॉट सफलतापूर्वक पंजीकृत।\n\nरोगी आईडी: ${params.patientId}\nअनुमानित प्रतीक्षा: 15 मिनट।`;
+        
+    case 'KGMU_CONFIRM':
+      return lang === 'EN'
+        ? `Registered at KGMU.\n\nPatient ID: ${params.patientId}\nRecommended Department: ${params.dept} OPD\nTriage Level: ${params.severity}\nEstimated wait: ${params.wait} mins.`
+        : `KGMU में पंजीकृत किया गया।\n\nरोगी आईडी: ${params.patientId}\nअनुशंसित विभाग: KGMU ${params.dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nअनुमानित प्रतीक्षा: ${params.wait} मिनट।`;
+
+    case 'PRESET_CRITICAL':
+      return lang === 'EN'
+        ? 'I have intense chest pain, tightness, and sweating profusely. It radiates to my left arm.'
+        : 'मुझे छाती में तेज दर्द, घुटन और बहुत पसीना आ रहा है। यह दर्द मेरे बाएं हाथ में फैल रहा है।';
+        
+    case 'PRESET_FEVER':
+      return lang === 'EN'
+        ? 'I have a mild fever (99.8 F), runny nose, and body ache since yesterday.'
+        : 'मुझे कल से हल्का बुखार (99.8 F), बहती नाक और बदन दर्द है।';
+        
+    case 'PRESET_FRACTURE':
+      return lang === 'EN'
+        ? 'I fell down and twisted my ankle. It is swollen and hurts to walk, but no bleeding.'
+        : 'मैं गिर गया और मेरे टखने में मोच आ गई। इसमें सूजन है और चलने में दर्द हो रहा है, लेकिन खून नहीं बह रहा।';
+
+    case 'PRESET_DEMO_NAME':
+      return lang === 'EN' ? 'Aditya Pandey' : 'आदित्य पाण्डेय';
+
+    case 'PRESET_DEMO_GENDER':
+      return lang === 'EN' ? 'Male' : 'Male';
+
+    case 'PRESET_CONGESTION_CIVIL':
+      return lang === 'EN' ? 'Route to Civil Hospital 🏢' : 'सिविल अस्पताल 🏢';
+
+    case 'PRESET_CONGESTION_KGMU':
+      return lang === 'EN' ? 'Continue at KGMU 🏥' : 'KGMU में ही रहें 🏥';
+
+    default:
+      return null;
+  }
+};
+
 export default function ChatInterface({ language, setLanguage, onCriticalTriage, onNormalTriage, deptSettings, getEstimatedWait, queueData }) {
   const [currentState, setCurrentState] = useState(CHAT_STATE.AWAITING_SYMPTOMS);
   const [registeredPatientId, setRegisteredPatientId] = useState(null);
@@ -47,12 +150,30 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
     {
       id: 1,
       sender: 'bot',
+      type: 'WELCOME',
       text: language === 'EN' 
         ? "Welcome to KGMU AI Triage. 🏥\n\nI am the KGMU Emergency Assistant. Please describe your symptoms in detail so I can determine your triage level.\n\nYou can type your symptoms, use the quick buttons below, or hold the mic 🎙️ to send a voice note."
         : "KGMU AI ट्राइएज में आपका स्वागत है। 🏥\n\nमैं KGMU आपातकालीन सहायक हूँ। कृपया अपने लक्षणों का विस्तार से वर्णन करें ताकि मैं आपकी आपातकालीन गंभीरता (Triage Level) निर्धारित कर सकूं।\n\nआप नीचे दिए गए बटनों का उपयोग कर सकते हैं, टाइप कर सकते हैं, या वॉयस नोट भेजने के लिए माइक 🎙️ बटन दबा सकते हैं।",
       timestamp: '20:16'
     }
   ]);
+
+  useEffect(() => {
+    setMessages(prevMessages => 
+      prevMessages.map(msg => {
+        if (msg.type) {
+          const newText = getLocalizedMessageText(msg.type, language, msg.params);
+          if (newText) {
+            return {
+              ...msg,
+              text: newText
+            };
+          }
+        }
+        return msg;
+      })
+    );
+  }, [language]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -85,14 +206,34 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
     }
   ];
 
-  const handleSend = (textToSend) => {
+  const handleSend = (textToSend, msgType = null) => {
     const messageText = textToSend || input;
     if (!messageText.trim()) return;
+
+    let finalType = msgType;
+    if (!finalType) {
+      if (messageText === symptomPresets[0].symptomsEn || messageText === symptomPresets[0].symptomsHi) {
+        finalType = 'PRESET_CRITICAL';
+      } else if (messageText === symptomPresets[1].symptomsEn || messageText === symptomPresets[1].symptomsHi) {
+        finalType = 'PRESET_FEVER';
+      } else if (messageText === symptomPresets[2].symptomsEn || messageText === symptomPresets[2].symptomsHi) {
+        finalType = 'PRESET_FRACTURE';
+      } else if (messageText === 'Aditya Pandey' || messageText === 'आदित्य पाण्डेय') {
+        finalType = 'PRESET_DEMO_NAME';
+      } else if (messageText === 'Male') {
+        finalType = 'PRESET_DEMO_GENDER';
+      } else if (messageText.includes('Civil Hospital') || messageText.includes('सिविल अस्पताल')) {
+        finalType = 'PRESET_CONGESTION_CIVIL';
+      } else if (messageText.includes('Continue at KGMU') || messageText.includes('KGMU में ही रहें')) {
+        finalType = 'PRESET_CONGESTION_KGMU';
+      }
+    }
 
     // Add user message to UI
     const userMsg = {
       id: Date.now(),
       sender: 'user',
+      type: finalType,
       text: messageText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
     };
@@ -129,6 +270,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           const log1 = {
             id: Date.now() + 1,
             sender: 'bot',
+            type: 'ANALYZING_SYMPTOMS',
             text: language === 'EN' 
               ? "🔍 *AI Agent:* Parsing symptoms for clinical indicators..."
               : "🔍 *AI Agent:* नैदानिक लक्षणों के लिए जांच की जा रही है...",
@@ -140,6 +282,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             const log2 = {
               id: Date.now() + 2,
               sender: 'bot',
+              type: 'ACUITY_DETECTION',
+              params: { isCritical },
               text: isCritical 
                 ? (language === 'EN' 
                     ? "🚨 *AI Agent:* Severe cardiovascular indicators detected. Triage severity level 5."
@@ -155,6 +299,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
               const log3 = {
                 id: Date.now() + 3,
                 sender: 'bot',
+                type: 'ASK_NAME',
                 text: language === 'EN'
                   ? "To create your triage record and book your appointment, please enter your **Full Name**:"
                   : "ट्राइएज रिकॉर्ड और पंजीकरण बनाने के लिए, कृपया अपना **पूरा नाम** दर्ज करें:",
@@ -177,6 +322,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         const botReply = {
           id: Date.now() + 1,
           sender: 'bot',
+          type: 'ASK_AGE',
+          params: { name: messageText },
           text: language === 'EN'
             ? `Thank you, ${messageText}. What is your **Age** (in years)?`
             : `धन्यवाद, ${messageText}। आपकी **उम्र** क्या है (वर्षों में)?`,
@@ -195,6 +342,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         const botReply = {
           id: Date.now() + 1,
           sender: 'bot',
+          type: 'ASK_GENDER',
           text: language === 'EN'
             ? "What is your **Gender**? (Male / Female / Other)"
             : "आपका **लिंग** क्या है? (पुरुष / महिला / अन्य)",
@@ -213,6 +361,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         const botReply = {
           id: Date.now() + 1,
           sender: 'bot',
+          type: 'ASK_MOBILE',
           text: language === 'EN'
             ? "Please enter your **10-digit Mobile Number** for appointment verification and SMS updates:"
             : "सत्यापन और SMS अपडेट के लिए कृपया अपना **10-अंकीय मोबाइल नंबर** दर्ज करें:",
@@ -250,6 +399,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           const botReply = {
             id: Date.now() + 1,
             sender: 'bot',
+            type: 'CRITICAL_CONFIRM',
+            params: { name: finalData.name, patientId },
             text: language === 'EN'
               ? `Processing emergency registration... Account generated for ${finalData.name}.\n\nPatient ID: ${patientId}\nRecommended: Lari Cardiology Emergency`
               : `आपातकालीन पंजीकरण किया जा रहा है... ${finalData.name} के लिए खाता तैयार।\n\nरोगी आईडी: ${patientId}\nसुझाव: लारी कार्डियोलॉजी इमरजेंसी`,
@@ -260,6 +411,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             id: Date.now() + 2,
             sender: 'bot',
             isBypassCard: true,
+            type: 'CRITICAL_BYPASS',
             text: language === 'EN'
               ? `🚨 CRITICAL CARDIOVASCULAR EMERGENCY. Proceed immediately to Lari Cardiology Emergency. Your queue number has been bypassed. Show this screen at the gate.`
               : `🚨 गंभीर हृदय आपातकाल। तुरंत लारी कार्डियोलॉजी इमरजेंसी (Lari Cardiology Emergency) में जाएं। आपका नंबर बाईपास कर दिया गया है। गेट पर यह स्क्रीन दिखाएं।`,
@@ -291,6 +443,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             const botReply = {
               id: Date.now() + 1,
               sender: 'bot',
+              type: 'CONGESTION_PROMPT',
+              params: { dept, wait },
               text: congestionText,
               timestamp: timeStr
             };
@@ -314,6 +468,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             const botReply = {
               id: Date.now() + 1,
               sender: 'bot',
+              type: 'NORMAL_CONFIRM',
+              params: { name: finalData.name, patientId, dept, severity, wait, mobile: finalData.mobile },
               text: language === 'EN'
                 ? `Appointment registered successfully for ${finalData.name}.\n\nPatient ID: ${patientId}\nRecommended Department: ${dept} OPD\nTriage Level: ${severity}\nEstimated wait: ${wait} mins.\n\nVerification SMS ticket sent to ${finalData.mobile}.`
                 : `पंजीकरण पूरा हुआ, ${finalData.name}।\n\nरोगी आईडी: ${patientId}\nअनुशंसित विभाग: KGMU ${dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nआपातकालीन स्तर: ${severity}\nअनुमानित प्रतीक्षा: ${wait} मिनट।\n\nSMS टिकट ${finalData.mobile} पर भेज दिया गया है।`,
@@ -355,6 +511,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           const botReply = {
             id: Date.now() + 1,
             sender: 'bot',
+            type: 'CIVIL_CONFIRM',
+            params: { patientId },
             text: language === 'EN'
               ? `Slot registered successfully at Lucknow Civil Hospital General OPD.\n\nPatient ID: ${patientId}\nEstimated wait: 15 mins.\n\nAmbulance/transit load-balanced telemetry logged.`
               : `लखनऊ सिविल अस्पताल जनरल ओपीडी में स्लॉट सफलतापूर्वक पंजीकृत।\n\nरोगी आईडी: ${patientId}\nअनुमानित प्रतीक्षा: 15 मिनट।`,
@@ -385,6 +543,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           const botReply = {
             id: Date.now() + 1,
             sender: 'bot',
+            type: 'KGMU_CONFIRM',
+            params: { patientId, dept, severity, wait },
             text: language === 'EN'
               ? `Registered at KGMU.\n\nPatient ID: ${patientId}\nRecommended Department: ${dept} OPD\nTriage Level: ${severity}\nEstimated wait: ${wait} mins.`
               : `KGMU में पंजीकृत किया गया।\n\nरोगी आईडी: ${patientId}\nअनुशंसित विभाग: KGMU ${dept === 'General Medicine' ? 'सामान्य चिकित्सा' : 'ट्रॉमा इमरजेंसी'} ओपीडी\nअनुमानित प्रतीक्षा: ${wait} मिनट।`,
