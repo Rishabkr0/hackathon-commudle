@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Send, 
   Mic, 
@@ -122,7 +122,7 @@ const getLocalizedMessageText = (type, lang, params = {}) => {
   }
 };
 
-export default function ChatInterface({ language, setLanguage, onCriticalTriage, onNormalTriage, deptSettings, getEstimatedWait, queueData }) {
+export default function ChatInterface({ language, setLanguage, onCriticalTriage, onNormalTriage, getEstimatedWait, queueData }) {
   const [currentState, setCurrentState] = useState(CHAT_STATE.AWAITING_SYMPTOMS);
   const [registeredPatientId, setRegisteredPatientId] = useState(null);
   const [isVoice, setIsVoice] = useState(false);
@@ -158,26 +158,11 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
     }
   ]);
 
-  useEffect(() => {
-    setMessages(prevMessages => 
-      prevMessages.map(msg => {
-        if (msg.type) {
-          const newText = getLocalizedMessageText(msg.type, language, msg.params);
-          if (newText) {
-            return {
-              ...msg,
-              text: newText
-            };
-          }
-        }
-        return msg;
-      })
-    );
-  }, [language]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const chatEndRef = useRef(null);
+  const messageIdRef = useRef(100);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -231,7 +216,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
 
     // Add user message to UI
     const userMsg = {
-      id: Date.now(),
+      id: messageIdRef.current++,
       sender: 'user',
       type: finalType,
       text: messageText,
@@ -268,7 +253,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
 
         setTimeout(() => {
           const log1 = {
-            id: Date.now() + 1,
+            id: messageIdRef.current++,
             sender: 'bot',
             type: 'ANALYZING_SYMPTOMS',
             text: language === 'EN' 
@@ -280,7 +265,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           
           setTimeout(() => {
             const log2 = {
-              id: Date.now() + 2,
+              id: messageIdRef.current++,
               sender: 'bot',
               type: 'ACUITY_DETECTION',
               params: { isCritical },
@@ -297,7 +282,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             
             setTimeout(() => {
               const log3 = {
-                id: Date.now() + 3,
+                id: messageIdRef.current++,
                 sender: 'bot',
                 type: 'ASK_NAME',
                 text: language === 'EN'
@@ -320,7 +305,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         }));
 
         const botReply = {
-          id: Date.now() + 1,
+          id: messageIdRef.current++,
           sender: 'bot',
           type: 'ASK_AGE',
           params: { name: messageText },
@@ -340,7 +325,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         }));
 
         const botReply = {
-          id: Date.now() + 1,
+          id: messageIdRef.current++,
           sender: 'bot',
           type: 'ASK_GENDER',
           text: language === 'EN'
@@ -359,7 +344,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
         }));
 
         const botReply = {
-          id: Date.now() + 1,
+          id: messageIdRef.current++,
           sender: 'bot',
           type: 'ASK_MOBILE',
           text: language === 'EN'
@@ -397,7 +382,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           };
 
           const botReply = {
-            id: Date.now() + 1,
+            id: messageIdRef.current++,
             sender: 'bot',
             type: 'CRITICAL_CONFIRM',
             params: { name: finalData.name, patientId },
@@ -408,7 +393,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           };
 
           const bypassCard = {
-            id: Date.now() + 2,
+            id: messageIdRef.current++,
             sender: 'bot',
             isBypassCard: true,
             type: 'CRITICAL_BYPASS',
@@ -441,7 +426,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
               : `⚠️ *KGMU AI:* KGMU ${dept} में अत्यधिक भीड़ है। अनुमानित प्रतीक्षा समय **${wait} मिनट** है।\n\nलखनऊ सिविल अस्पताल में वर्तमान में प्रतीक्षा समय केवल **15 मिनट** है।\n\nक्या आप अपना ओपीडी स्लॉट **लखनऊ सिविल अस्पताल** में पुनर्निर्देशित और पंजीकृत करना चाहेंगे?`;
             
             const botReply = {
-              id: Date.now() + 1,
+              id: messageIdRef.current++,
               sender: 'bot',
               type: 'CONGESTION_PROMPT',
               params: { dept, wait },
@@ -466,7 +451,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             };
 
             const botReply = {
-              id: Date.now() + 1,
+              id: messageIdRef.current++,
               sender: 'bot',
               type: 'NORMAL_CONFIRM',
               params: { name: finalData.name, patientId, dept, severity, wait, mobile: finalData.mobile },
@@ -509,7 +494,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           };
 
           const botReply = {
-            id: Date.now() + 1,
+            id: messageIdRef.current++,
             sender: 'bot',
             type: 'CIVIL_CONFIRM',
             params: { patientId },
@@ -541,7 +526,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
           };
 
           const botReply = {
-            id: Date.now() + 1,
+            id: messageIdRef.current++,
             sender: 'bot',
             type: 'KGMU_CONFIRM',
             params: { patientId, dept, severity, wait },
@@ -956,6 +941,8 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
             {/* Chat Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2] relative">
               {messages.map((msg) => {
+                const textContent = msg.type ? (getLocalizedMessageText(msg.type, language, msg.params) || msg.text) : msg.text;
+
                 if (msg.isBypassCard) {
                   return (
                     <div 
@@ -969,7 +956,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
                         Critical Bypass Protocol
                       </h4>
                       <p className="text-[11px] text-slate-800 leading-relaxed font-semibold">
-                        {msg.text}
+                        {textContent}
                       </p>
                       <div className="mt-3 pt-2.5 border-t border-red-200 flex justify-between items-center text-[10px] text-red-700 font-mono font-bold">
                         <span>ID: {msg.patientId}</span>
@@ -992,7 +979,7 @@ export default function ChatInterface({ language, setLanguage, onCriticalTriage,
                           : 'bg-white text-slate-855 rounded-tl-none'
                       }`}
                     >
-                      {msg.text}
+                      {textContent}
                       <div className={`text-[8px] text-right mt-1.5 font-mono ${isUser ? 'text-slate-500' : 'text-slate-400'}`}>
                         {msg.timestamp} {isUser && <CheckCheck className="w-3 h-3 inline-block ml-1 text-sky-500" />}
                       </div>
